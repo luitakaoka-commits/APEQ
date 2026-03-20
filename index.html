@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MemoriX — 記憶の海を渡れ</title>
+
+  <!-- ═══ PWA ═══ -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0d1b2a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MemoriX" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <!-- ═══ Tailwind CDN ═══ -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:  { 950: '#030b14', 900: '#0d1b2a', 800: '#112236', 700: '#172d46', 600: '#1e3a5f' },
+            amber: { 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b' },
+            slate: { 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b' },
+          },
+          fontFamily: {
+            display: ['"Zen Kaku Gothic New"', 'sans-serif'],
+            body:    ['"Noto Sans JP"', 'sans-serif'],
+            mono:    ['"JetBrains Mono"', 'monospace'],
+          },
+          boxShadow: {
+            'glow-amber': '0 0 24px rgba(251,191,36,0.25)',
+            'glow-blue':  '0 0 32px rgba(59,130,246,0.15)',
+            'card':       '0 8px 32px rgba(0,0,0,0.45)',
+          },
+          backgroundImage: {
+            'noise': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E\")",
+          },
+          animation: {
+            'float':      'float 6s ease-in-out infinite',
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
+            'slide-up':   'slideUp 0.4s cubic-bezier(0.16,1,0.3,1)',
+            'fade-in':    'fadeIn 0.35s ease forwards',
+          },
+          keyframes: {
+            float:    { '0%,100%': {transform:'translateY(0)'}, '50%': {transform:'translateY(-8px)'} },
+            slideUp:  { from: {opacity:0, transform:'translateY(16px)'}, to: {opacity:1, transform:'translateY(0)'} },
+            fadeIn:   { from: {opacity:0}, to: {opacity:1} },
+          },
+        }
+      }
+    };
+  </script>
+
+  <!-- ═══ Google Fonts ═══ -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Base Reset & Variables ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --color-bg:      #030b14;
+      --color-surface: #0d1b2a;
+      --color-border:  rgba(255,255,255,0.07);
+      --color-accent:  #fbbf24;
+      --color-accent2: #38bdf8;
+      --safe-top:      env(safe-area-inset-top, 0px);
+      --safe-bottom:   env(safe-area-inset-bottom, 0px);
+    }
+    html, body { height: 100%; margin: 0; background: var(--color-bg); color: #e2e8f0; font-family: 'Noto Sans JP', sans-serif; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(251,191,36,0.3); border-radius: 99px; }
+
+    /* ── Noise overlay (pseudo-texture) ── */
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      opacity: 0.4;
+    }
+
+    /* ── Glassmorphism card ── */
+    .glass {
+      background: rgba(17,34,54,0.75);
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      border: 1px solid var(--color-border);
+    }
+
+    /* ── Tab active state ── */
+    .tab-btn.active {
+      color: var(--color-accent);
+      border-bottom: 2px solid var(--color-accent);
+    }
+    .tab-btn { border-bottom: 2px solid transparent; transition: color .2s, border-color .2s; }
+
+    /* ── Page panels ── */
+    .page { display: none; animation: slideUp 0.4s cubic-bezier(0.16,1,0.3,1); }
+    .page.active { display: block; }
+
+    /* ── Textarea autoresize helper ── */
+    textarea { resize: none; field-sizing: content; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: calc(80px + var(--safe-bottom)); left:50%; transform:translateX(-50%) translateY(20px);
+      background: rgba(17,34,54,0.95); border:1px solid var(--color-border);
+      backdrop-filter:blur(12px); border-radius:12px; padding:10px 20px;
+      font-size:0.85rem; opacity:0; transition: opacity .3s, transform .3s;
+      white-space:nowrap; pointer-events:none; z-index:9999;
+    }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-color: rgba(251,191,36,0.5); color: #fbbf24; }
+    #toast.error   { border-color: rgba(239,68,68,0.5);  color: #f87171; }
+
+    /* ── Progress bar for import ── */
+    #progress-bar-inner { transition: width .3s ease; }
+
+    /* ── Decorative glow orbs ── */
+    .orb {
+      position: fixed; border-radius: 50%; filter: blur(80px);
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── Card flip placeholder (Phase 3) ── */
+    .flash-card { perspective: 1000px; }
+    .flash-card-inner { transform-style: preserve-3d; transition: transform .5s cubic-bezier(.4,0,.2,1); }
+    .flash-card.flipped .flash-card-inner { transform: rotateY(180deg); }
+    .flash-card-front, .flash-card-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .flash-card-back { transform: rotateY(180deg); }
+  </style>
+</head>
+
+<body class="relative min-h-screen overflow-x-hidden" style="padding-top: var(--safe-top); padding-bottom: var(--safe-bottom);">
+
+  <!-- ── Decorative orbs ── -->
+  <div class="orb w-96 h-96 bg-blue-900 opacity-20" style="top:-120px; right:-80px;"></div>
+  <div class="orb w-72 h-72 bg-amber-900 opacity-15" style="bottom:20%; left:-60px;"></div>
+
+  <!-- ════════════════════════════════════════
+       HEADER
+  ════════════════════════════════════════ -->
+  <header class="relative z-10 glass border-b border-white/5 sticky top-0">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <!-- Logo mark -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg,#fbbf24,#f59e0b)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3L4 7V13C4 17.4 7.4 21.5 12 22.5C16.6 21.5 20 17.4 20 13V7L12 3Z" fill="rgba(0,0,0,0.4)" stroke="#0d1b2a" stroke-width="0.5"/>
+            <path d="M9 12L11 14L15 10" stroke="#0d1b2a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="font-display font-black text-lg tracking-tight" style="color: #fbbf24; letter-spacing:-0.02em;">MemoriX</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Sync status indicator -->
+        <div id="sync-indicator" class="flex items-center gap-1.5 text-xs text-slate-400">
+          <div id="sync-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500 transition-colors duration-500"></div>
+          <span id="sync-label">準備中</span>
+        </div>
+        <!-- JST clock -->
+        <div id="jst-clock" class="font-mono text-xs text-slate-500 hidden sm:block"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════
+       MAIN CONTENT AREA
+  ════════════════════════════════════════ -->
+  <main class="relative z-10 max-w-2xl mx-auto px-4 py-6 pb-28">
+
+    <!-- ── PAGE: インポート ── -->
+    <section id="page-import" class="page active">
+
+      <!-- Hero text -->
+      <div class="mb-6">
+        <h1 class="font-display font-black text-2xl text-white leading-tight">テキストをインポート</h1>
+        <p class="text-slate-400 text-sm mt-1">NotebookLM のマークダウン表を貼り付けてください</p>
+      </div>
+
+      <!-- Paste area -->
+      <div class="glass rounded-2xl overflow-hidden shadow-card mb-4">
+        <div class="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+          <span class="text-xs font-mono text-slate-500 uppercase tracking-widest">入力</span>
+          <button id="btn-clear-input" class="text-xs text-slate-600 hover:text-slate-400 transition-colors">クリア</button>
+        </div>
+        <div class="p-4">
+          <textarea
+            id="input-markdown"
+            class="w-full min-h-[200px] bg-transparent text-slate-300 text-sm font-mono placeholder-slate-700 outline-none leading-relaxed"
+            placeholder="| 用語 | 説明 |&#10;|------|------|&#10;| サンプル用語 | サンプル説明文 |"
+            spellcheck="false"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Options row -->
+      <div class="glass rounded-2xl p-4 mb-4 flex flex-col sm:flex-row gap-3">
+        <div class="flex-1">
+          <label class="text-xs text-slate-500 mb-1 block font-mono uppercase tracking-widest">教科 / タグ</label>
+          <input
+            id="input-subject"
+            type="text"
+            class="w-full bg-navy-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 transition-colors"
+            placeholder="例: 生物学, 英単語..."
+          />
+        </div>
+        <div class="flex-1">
+          <label class="text-xs text-slate-500 mb-1 block font-mono uppercase tracking-widest">列マッピング</label>
+          <div class="flex gap-2">
+            <input id="input-col-term" type="number" min="1" value="1"
+              class="w-16 bg-navy-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 transition-colors text-center"
+              placeholder="用語列"/>
+            <input id="input-col-def" type="number" min="1" value="2"
+              class="w-16 bg-navy-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 transition-colors text-center"
+              placeholder="定義列"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview section (populated by parser) -->
+      <div id="preview-section" class="hidden mb-4">
+        <div class="glass rounded-2xl overflow-hidden shadow-card">
+          <div class="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+            <span class="text-xs font-mono text-slate-500 uppercase tracking-widest">プレビュー</span>
+            <span id="preview-count" class="text-xs text-amber-400 font-mono"></span>
+          </div>
+          <div id="preview-list" class="divide-y divide-white/5 max-h-64 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex gap-3">
+        <button id="btn-parse"
+          class="flex-1 py-3.5 rounded-2xl font-display font-bold text-sm text-navy-900 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          style="background: linear-gradient(135deg,#fbbf24,#f59e0b); color:#0d1b2a; box-shadow: 0 4px 20px rgba(251,191,36,0.3);">
+          解析する
+        </button>
+        <button id="btn-save"
+          class="flex-1 py-3.5 rounded-2xl font-display font-bold text-sm border border-amber-500/30 text-amber-400 transition-all duration-200 hover:bg-amber-500/10 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled>
+          Firestoreへ保存
+        </button>
+      </div>
+
+      <!-- Progress bar -->
+      <div id="progress-wrap" class="hidden mt-4">
+        <div class="glass rounded-full h-1.5 overflow-hidden">
+          <div id="progress-bar-inner" class="h-full rounded-full bg-amber-400" style="width:0%"></div>
+        </div>
+        <p id="progress-label" class="text-xs text-slate-500 mt-1.5 text-center font-mono"></p>
+      </div>
+
+    </section>
+
+    <!-- ── PAGE: カード一覧 ── -->
+    <section id="page-cards" class="page">
+      <div class="mb-6 flex items-center justify-between">
+        <div>
+          <h1 class="font-display font-black text-2xl text-white leading-tight">カード一覧</h1>
+          <p id="cards-subtitle" class="text-slate-400 text-sm mt-1">読み込み中...</p>
+        </div>
+        <div class="flex gap-2">
+          <input id="search-input" type="search" placeholder="検索..."
+            class="bg-navy-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 transition-colors w-32" />
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div id="subject-chips" class="flex gap-2 flex-wrap mb-4"></div>
+
+      <!-- Card list -->
+      <div id="card-list" class="space-y-3"></div>
+
+      <!-- Empty state -->
+      <div id="cards-empty" class="hidden text-center py-20">
+        <div class="text-5xl mb-4 animate-float">📭</div>
+        <p class="text-slate-500 text-sm">まだカードがありません<br/>インポートから始めましょう</p>
+      </div>
+
+      <!-- Load more -->
+      <button id="btn-load-more" class="hidden w-full mt-6 py-3 rounded-2xl border border-white/10 text-slate-400 text-sm hover:bg-white/5 transition-colors">
+        さらに読み込む
+      </button>
+    </section>
+
+    <!-- ── PAGE: 統計 ── -->
+    <section id="page-stats" class="page">
+      <div class="mb-6">
+        <h1 class="font-display font-black text-2xl text-white leading-tight">学習統計</h1>
+        <p class="text-slate-400 text-sm mt-1">メタデータから集計（全件読み込み不要）</p>
+      </div>
+
+      <!-- Stats grid (populated by loadStats) -->
+      <div id="stats-grid" class="grid grid-cols-2 gap-3 mb-6"></div>
+
+      <!-- Chart placeholder (Phase 2: Chart.js) -->
+      <div class="glass rounded-2xl p-6 flex items-center justify-center min-h-48 border border-dashed border-white/10">
+        <div class="text-center">
+          <div class="text-3xl mb-3">📊</div>
+          <p class="text-slate-500 text-sm">グラフはフェーズ2で実装</p>
+          <p class="text-slate-600 text-xs mt-1">Chart.js + メタデータ集計</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PAGE: 復習 ── -->
+    <section id="page-review" class="page">
+      <div class="mb-6">
+        <h1 class="font-display font-black text-2xl text-white leading-tight">スワイプ復習</h1>
+        <p class="text-slate-400 text-sm mt-1">フェーズ3でTinder風UIを実装予定</p>
+      </div>
+
+      <!-- Placeholder card stack -->
+      <div class="relative flex items-center justify-center min-h-72">
+        <div class="glass rounded-3xl w-full max-w-sm p-8 shadow-card border border-dashed border-white/10 text-center">
+          <div class="text-4xl mb-4 animate-float">🃏</div>
+          <p class="text-slate-400 text-sm mb-2">Touch Event APIによる</p>
+          <p class="text-amber-400 font-display font-bold">スワイプUI</p>
+          <p class="text-slate-600 text-xs mt-3">touch-action制御でAndroid対応</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ════════════════════════════════════════
+       BOTTOM NAVIGATION
+  ════════════════════════════════════════ -->
+  <nav class="fixed bottom-0 left-0 right-0 z-20 glass border-t border-white/5"
+       style="padding-bottom: var(--safe-bottom);">
+    <div class="max-w-2xl mx-auto flex">
+      <button data-page="import" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-500 hover:text-slate-300 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="text-[10px] font-mono uppercase tracking-widest">Import</span>
+      </button>
+      <button data-page="cards" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-500 hover:text-slate-300 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        <span class="text-[10px] font-mono uppercase tracking-widest">Cards</span>
+      </button>
+      <button data-page="review" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-500 hover:text-slate-300 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span class="text-[10px] font-mono uppercase tracking-widest">Review</span>
+      </button>
+      <button data-page="stats" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-500 hover:text-slate-300 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="text-[10px] font-mono uppercase tracking-widest">Stats</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════
+       TOAST NOTIFICATION
+  ════════════════════════════════════════ -->
+  <div id="toast"></div>
+
+  <!-- ════════════════════════════════════════
+       Firebase v9 (CDN — Compat + Modular)
+       ※ Use the modular CDN builds
+  ════════════════════════════════════════ -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>
