@@ -113,6 +113,24 @@
     .q-card { transition:border-color .12s,transform .12s; }
     .q-card:hover { border-color:rgba(251,191,36,.22); }
 
+    /* ── 教科フォルダカード ── */
+    .folder-card { transition:transform .15s,border-color .15s,box-shadow .15s; cursor:pointer; }
+    .folder-card:hover { transform:translateY(-2px); border-color:rgba(251,191,36,.3); box-shadow:0 8px 24px rgba(0,0,0,.4); }
+    .folder-card:active { transform:scale(.97); }
+
+    /* ── フラッシュカード 3D反転 ── */
+    .fc-scene { perspective:1000px; width:100%; }
+    .fc-inner {
+      position:relative; width:100%;
+      transform-style:preserve-3d;
+      transition:transform .45s cubic-bezier(.4,0,.2,1);
+    }
+    .fc-inner.flipped { transform:rotateY(180deg); }
+    .fc-front, .fc-back {
+      backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;
+    }
+    .fc-back { transform:rotateY(180deg); }
     /* Input focus */
     input:focus,textarea:focus { outline:none; border-color:rgba(251,191,36,.45) !important; }
 
@@ -272,27 +290,99 @@
           <div class="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
             <span class="text-2xs text-slate-500 uppercase tracking-widest font-bold">プレビュー</span>
             <span id="preview-count" class="text-xs text-amber-400 font-mono font-bold"></span>
-          </div>
-          <div id="preview-list" class="divide-y divide-white/5 max-h-52 overflow-y-auto"></div>
-          <div id="warn-list" class="hidden px-4 py-2 border-t border-white/5 space-y-1 max-h-24 overflow-y-auto"></div>
+       
+            <!-- ─── PAGE: カード一覧（フォルダ → フラッシュカード） ─── -->
+    <section id="page-cards" class="page">
+
+      <!-- VIEW A: 教科フォルダ一覧 -->
+      <div id="view-folders">
+        <div class="mb-4">
+          <h1 class="font-black text-xl text-white">問題一覧</h1>
+          <p id="cards-sub" class="text-slate-400 text-xs mt-0.5">教科を選んでください</p>
         </div>
-        <button id="btn-save"
-          class="mt-3 w-full py-3 rounded-xl font-bold text-sm border active:scale-95 transition-transform duration-100 hover:bg-amber-500/8 disabled:opacity-40 disabled:cursor-not-allowed"
-          style="border-color:rgba(251,191,36,.35);color:#fbbf24">
-          Firestore へ保存する
-        </button>
-        <div id="prog-wrap" class="hidden mt-3">
-          <div class="bg-ink-800 rounded-full h-1 overflow-hidden border border-white/5">
-            <div id="prog-inner" class="h-full bg-amber-400 rounded-full" style="width:0%"></div>
-          </div>
-          <p id="prog-lbl" class="text-2xs text-slate-500 mt-1.5 text-center font-mono"></p>
+        <div id="folder-grid" class="grid grid-cols-2 gap-3"></div>
+        <div id="cards-empty" class="hidden text-center py-20">
+          <div class="text-5xl mb-3" style="animation:float 6s ease-in-out infinite">📭</div>
+          <p class="text-slate-500 text-sm">まだ問題がありません<br/>インポートから追加してください</p>
         </div>
       </div>
-    </section>
 
-    <!-- ─── PAGE: カード一覧 ─── -->
-    <section id="page-cards" class="page">
-      <div class="mb-4 flex items-start justify-between gap-3">
+      <!-- VIEW B: フラッシュカード学習（デフォルト非表示） -->
+      <div id="view-flashcard" class="hidden">
+
+        <!-- ヘッダー -->
+        <div class="flex items-center gap-3 mb-5">
+          <button id="fc-back-btn"
+            class="w-8 h-8 glass rounded-xl flex items-center justify-center border border-white/8 hover:border-white/20 transition-colors shrink-0">
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <div class="flex-1 min-w-0">
+            <h2 id="fc-subject-title" class="font-black text-base text-white truncate"></h2>
+            <p id="fc-progress-label" class="text-2xs text-slate-500 font-mono mt-0.5"></p>
+          </div>
+        </div>
+
+        <!-- プログレスバー -->
+        <div class="bg-ink-800 rounded-full h-1 mb-5 overflow-hidden border border-white/5">
+          <div id="fc-progress-bar" class="h-full bg-amber-400 rounded-full transition-all duration-300" style="width:0%"></div>
+        </div>
+
+        <!-- カード本体（タップで反転） -->
+        <div class="fc-scene mb-5" style="min-height:240px;">
+          <div id="fc-inner" class="fc-inner">
+
+            <!-- 表: 問題 -->
+            <div class="fc-front glass rounded-3xl p-8 flex flex-col items-center justify-center text-center border border-white/8"
+                 style="min-height:240px;">
+              <p class="text-2xs text-slate-500 uppercase tracking-widest font-bold mb-4">問題</p>
+              <p id="fc-question" class="text-base font-bold text-white leading-relaxed"></p>
+              <p class="text-2xs text-slate-600 mt-6">タップして答えを見る</p>
+            </div>
+
+            <!-- 裏: 正解 + 元ネタ -->
+            <div class="fc-back glass rounded-3xl p-8 flex flex-col items-center justify-center text-center border border-amber-500/20 absolute inset-0"
+                 style="min-height:240px;">
+              <p class="text-2xs text-amber-500/60 uppercase tracking-widest font-bold mb-4">正解</p>
+              <p id="fc-answer" class="text-lg font-black text-amber-400 leading-relaxed"></p>
+              <div id="fc-source-wrap" class="hidden mt-4 pt-4 border-t border-white/8 w-full">
+                <p class="text-2xs text-slate-500 uppercase tracking-widest font-bold mb-1">元ネタ</p>
+                <p id="fc-source" class="text-xs text-slate-400 leading-relaxed"></p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 操作ボタン -->
+        <div class="flex gap-3">
+          <button id="fc-prev"
+            class="flex-1 py-3 glass rounded-2xl text-slate-400 text-sm border border-white/8 hover:border-white/20 transition-colors active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled>← 前へ</button>
+          <button id="fc-flip"
+            class="flex-1 py-3 rounded-2xl font-bold text-sm active:scale-95 transition-transform"
+            style="background:linear-gradient(135deg,#fbbf24,#d97706);color:#0f172a;">
+            反転する
+          </button>
+          <button id="fc-next"
+            class="flex-1 py-3 glass rounded-2xl text-slate-400 text-sm border border-white/8 hover:border-white/20 transition-colors active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+            次へ →</button>
+        </div>
+
+        <!-- 完了メッセージ -->
+        <div id="fc-complete" class="hidden mt-6 glass rounded-2xl p-6 text-center border border-amber-500/20">
+          <div class="text-4xl mb-3">🎉</div>
+          <p class="font-black text-white">セット完了！</p>
+          <p class="text-slate-400 text-xs mt-1">お疲れ様でした</p>
+          <button id="fc-restart"
+            class="mt-4 px-6 py-2.5 rounded-xl font-bold text-sm border border-amber-400/40 text-amber-400 hover:bg-amber-400/10 transition-colors active:scale-95">
+            もう一度
+          </button>
+        </div>
+
+      </div>
+    </section>
         <div>
           <h1 class="font-black text-xl text-white">問題一覧</h1>
           <p id="cards-sub" class="text-slate-400 text-xs mt-0.5">読み込み中...</p>
